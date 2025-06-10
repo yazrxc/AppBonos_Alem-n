@@ -1,0 +1,20 @@
+body {
+  font-family: 'Segoe UI', sans-serif;
+  background: #f8f9fa;
+}
+
+.sidebar {
+  width: 250px;
+  height: 100vh;
+  position: sticky;
+  top: 0;
+}
+
+.main-content {
+  flex-grow: 1;
+  padding: 2rem;
+}
+
+.btn-dark {
+  border-radius: 30px;
+}

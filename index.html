@@ -3,10 +3,9 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Calculadora de Bonos</title>
+  <title>Calculadora de Bonos - Inicio</title>
   <link rel="stylesheet" href="style.css">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
-  
 </head>
 <body>
 
@@ -19,23 +18,34 @@
     <hr>
     <ul class="nav nav-pills flex-column mb-auto">
       <li><a href="index.html" class="nav-link active">Inicio</a></li>
+      <!-- Your registrar.html is for bond simulation, not user registration -->
       <li><a href="registrar.html" class="nav-link">Simulación bono</a></li>
-      <li><a href="#" class="nav-link">Detalle</a></li>
-      <li><a href="#" class="nav-link">Indicadores Financieros</a></li>
+      <li><a href="#" class="nav-link">Detalle (Próximamente)</a></li>
+      <li><a href="#" class="nav-link">Indicadores Financieros (Próximamente)</a></li>
     </ul>
     <hr>
     <div class="dropdown">
       <a href="#" class="d-flex align-items-center text-decoration-none dropdown-toggle" data-bs-toggle="dropdown">
-        <strong>Administrador</strong>
+        <strong id="userDisplay">Usuario</strong> <!-- ID to display username -->
       </a>
       <ul class="dropdown-menu text-small shadow">
-        <li><a class="dropdown-item" href="#">Cerrar sesión</a></li>
+        <li><a class="dropdown-item" href="#" id="logoutButton">Cerrar sesión</a></li> <!-- ID for logout -->
       </ul>
     </div>
+  </div>
+
+  <!-- Main Content Area for index.html -->
+  <div class="main-content container-fluid p-4">
+    <h1>Bienvenido a la Aplicación de Bonos</h1>
+    <p>Utiliza el menú de la izquierda para navegar.</p>
+    <p>Esta es la página principal. Desde aquí puedes acceder a la simulación de bonos y otras funcionalidades.</p>
+    <!-- You can add more content here specific to the index page -->
   </div>
 
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+<script src="auth.js"></script> <!-- Add auth.js here -->
+<!-- Your script.js for bond calculations is loaded by registrar.html -->
 </body>
 </html>

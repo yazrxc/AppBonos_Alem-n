@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Registro - Bonos App</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+    <style>
+        body {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            background-color: #f8f9fa;
+        }
+        .register-container {
+            max-width: 500px; /* Slightly wider for more fields */
+            padding: 2rem;
+            background-color: white;
+            border-radius: 0.5rem;
+            box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+        }
+    </style>
+</head>
+<body>
+    <div class="register-container">
+        <h2 class="text-center mb-4">Bonos App - Crear Cuenta</h2>
+        <form id="registerForm">
+            <div class="mb-3">
+                <label for="regNombre" class="form-label">Nombre Completo</label>
+                <input type="text" class="form-control" id="regNombre" required>
+            </div>
+            <div class="mb-3">
+                <label for="regUsername" class="form-label">Nombre de Usuario</label>
+                <input type="text" class="form-control" id="regUsername" required>
+            </div>
+            <div class="mb-3">
+                <label for="regPassword" class="form-label">Contraseña</label>
+                <input type="password" class="form-control" id="regPassword" required>
+            </div>
+            <div class="mb-3">
+                <label for="regFechaNacimiento" class="form-label">Fecha de Nacimiento (YYYY-MM-DD)</label>
+                <input type="date" class="form-control" id="regFechaNacimiento">
+            </div>
+            <div class="mb-3">
+                <label for="regGenero" class="form-label">Género</label>
+                <select class="form-select" id="regGenero">
+                    <option value="">Seleccionar...</option>
+                    <option value="Masculino">Masculino</option>
+                    <option value="Femenino">Femenino</option>
+                    <option value="Otro">Otro</option>
+                </select>
+            </div>
+            <!-- Add other optional fields if desired -->
+            <button type="submit" class="btn btn-success w-100">Registrarme</button>
+            <div id="registerMessage" class="mt-3 text-danger"></div>
+        </form>
+        <p class="mt-3 text-center">
+            ¿Ya tienes una cuenta? <a href="login.html">Inicia sesión aquí</a>
+        </p>
+    </div>
+
+    <script src="auth.js"></script>
+</body>
+</html>

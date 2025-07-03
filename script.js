@@ -1,4 +1,3 @@
-
 function formatValue(val) {
   return Math.abs(val).toLocaleString("es-PE", {
     minimumFractionDigits: 2,
@@ -6,11 +5,20 @@ function formatValue(val) {
   });
 }
 
+// Habilita/deshabilita campo de capitalización según tipo de tasa
+const tipoTasaSelect = document.getElementById("tipoTasa");
+const capitalizacionSelect = document.getElementById("capitalizacion");
+tipoTasaSelect.addEventListener("change", () => {
+  capitalizacionSelect.disabled = tipoTasaSelect.value !== "nominal";
+});
+
+// Habilita cuota inicial si aplica
 document.getElementById("usaCuotaInicial").addEventListener("change", () => {
   const habilitar = document.getElementById("usaCuotaInicial").value === "si";
   document.getElementById("porcentajeInicial").disabled = !habilitar;
 });
 
+// Cálculo principal
 document.getElementById("calculateBtn").addEventListener("click", () => {
   const usaCuota = document.getElementById("usaCuotaInicial").value === "si";
   const precioVenta = parseFloat(document.getElementById("precioVenta").value);
@@ -26,14 +34,30 @@ document.getElementById("calculateBtn").addEventListener("click", () => {
     );
   }
 
-  const tasaAnual =
-    parseFloat(document.getElementById("tasaEfectiva").value) / 100;
+  const tipoTasa = document.getElementById("tipoTasa").value;
+  const tasaInput = parseFloat(document.getElementById("tasaAnual").value) / 100;
+  const capitalizacion = tipoTasa === "nominal"
+    ? parseInt(document.getElementById("capitalizacion").value)
+    : null;
+
+  const tipoAnio = parseInt(document.getElementById("tipoAnio").value);
   const frecuencia = parseInt(document.getElementById("frecuencia").value);
   const plazo = parseInt(document.getElementById("plazo").value);
   const tipoGracia = document.getElementById("tipoGracia").value;
 
   const n = frecuencia * plazo;
-  const tasaPeriodo = Math.pow(1 + tasaAnual, 1 / frecuencia) - 1;
+
+  // Convertir a TEA si es nominal
+  let TEA;
+  if (tipoTasa === "efectiva") {
+    TEA = tasaInput;
+  } else {
+    TEA = Math.pow(1 + tasaInput / capitalizacion, capitalizacion) - 1;
+  }
+
+  // Calcular tasa del periodo con base en frecuencia
+  const tasaPeriodo = Math.pow(1 + TEA, 1 / frecuencia) - 1;
+
   const numPeriodosAmortiza =
     tipoGracia === "ninguna"
       ? n
@@ -44,6 +68,7 @@ document.getElementById("calculateBtn").addEventListener("click", () => {
   const amortizacion = principal / numPeriodosAmortiza;
   let saldo = principal;
 
+  // Crear tabla
   const tabla = document.createElement("table");
   tabla.className = "table table-striped table-bordered mt-3";
   const thead = tabla.createTHead();
@@ -94,15 +119,18 @@ document.getElementById("calculateBtn").addEventListener("click", () => {
   document.getElementById("amortizationTable").appendChild(tabla);
   document.getElementById("results").classList.remove("d-none");
 
-  //Guardar la simulación
+  // Guardar la simulación
   const bonoData = {
     precioVenta,
     usaCuota,
     porcentajeInicial: porcentajeInicial * 100,
-    tasaEfectiva: tasaAnual * 100,
+    tasaEfectiva: TEA * 100,
     frecuencia,
     plazo,
     tipoGracia,
+    tipoTasa,
+    capitalizacion,
+    tipoAnio,
     fecha: new Date().toLocaleString(),
   };
 
@@ -113,6 +141,7 @@ document.getElementById("calculateBtn").addEventListener("click", () => {
   mostrarBonos();
 });
 
+// Mostrar lista de bonos
 function mostrarBonos() {
   const bonos = JSON.parse(localStorage.getItem("bonos")) || [];
   const tablaBonosDiv = document.getElementById("tablaBonos");
@@ -165,7 +194,6 @@ function mostrarBonos() {
       td.textContent = val;
     });
 
-    
     const acciones = row.insertCell();
     const btn = document.createElement("button");
     btn.textContent = "Editar";
@@ -178,6 +206,7 @@ function mostrarBonos() {
   tablaBonosDiv.appendChild(tabla);
 }
 
+// Cargar datos en el formulario
 function cargarBono(index) {
   const bonos = JSON.parse(localStorage.getItem("bonos")) || [];
   const bono = bonos[index];
@@ -187,14 +216,21 @@ function cargarBono(index) {
   document.getElementById("porcentajeInicial").disabled = !bono.usaCuota;
   document.getElementById("porcentajeInicial").value = bono.porcentajeInicial;
 
-  document.getElementById("tasaEfectiva").value = bono.tasaEfectiva;
+  document.getElementById("tasaAnual").value = bono.tasaEfectiva;
   document.getElementById("frecuencia").value = bono.frecuencia;
   document.getElementById("plazo").value = bono.plazo;
   document.getElementById("tipoGracia").value = bono.tipoGracia;
+
+  if (bono.tipoTasa) document.getElementById("tipoTasa").value = bono.tipoTasa;
+  if (bono.capitalizacion)
+    document.getElementById("capitalizacion").value = bono.capitalizacion;
+  if (bono.tipoAnio)
+    document.getElementById("tipoAnio").value = bono.tipoAnio;
 
   alert("Bono cargado en el formulario. Puedes recalcular o modificar.");
 }
 
 window.onload = mostrarBonos;
+
 
 

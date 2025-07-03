@@ -55,9 +55,59 @@
             <form id="bondForm">
               <div class="row g-3">
                 <div class="col-md-6">
-                  <label class="form-label">Monto de venta</label>
-                  <input type="number" id="precioVenta" class="form-control" />
+                  <label class="form-label">Moneda</label>
+                  <select id="moneda" class="form-select">
+                    <option value="PEN">Soles</option>
+                    <option value="USD">Dólares</option>
+                    <option value="EUR">Euros</option>
+                  </select>
                 </div>
+
+                <div class="col-md-6">
+                  <label class="form-label">Tipo de tasa</label>
+                  <select id="tipoTasa" class="form-select">
+                    <option value="efectiva">Efectiva</option>
+                    <option value="nominal">Nominal</option>
+                  </select>
+                </div>
+
+                <div class="col-md-6">
+                  <label class="form-label">Capitalización (si es nominal)</label>
+                  <select id="capitalizacion" class="form-select" disabled>
+                    <option value="360">Diaria (360)</option>
+                    <option value="24">Quincenal</option>
+                    <option value="12">Mensual</option>
+                    <option value="6">Bimestral</option>
+                    <option value="4">Trimestral</option>
+                    <option value="3">Cuatrimestral</option>
+                    <option value="2">Semestral</option>
+                    <option value="1">Anual</option>
+                  </select>
+                </div>
+
+                <div class="col-md-6">
+                  <label class="form-label">Tipo de año</label>
+                  <select id="tipoAnio" class="form-select">
+                    <option value="360">360 días</option>
+                    <option value="365">365 días</option>
+                  </select>
+                </div>
+
+                <div class="col-md-6">
+                  <label class="form-label">Tasa Anual (%)</label>
+                  <input type="number" id="tasaAnual" class="form-control" step="0.01" required />
+                </div>
+
+                <div class="col-md-6">
+                  <label class="form-label">Frecuencia de Pago (veces/año)</label>
+                  <input type="number" id="frecuencia" class="form-control" step="1" required />
+                </div>
+
+                <div class="col-md-6">
+                  <label class="form-label">Plazo Total (Años)</label>
+                  <input type="number" id="plazo" class="form-control" step="1" required />
+                </div>
+
                 <div class="col-md-6">
                   <label class="form-label">¿Desea incluir cuota inicial?</label>
                   <select id="usaCuotaInicial" class="form-select">
@@ -65,22 +115,17 @@
                     <option value="si">Sí</option>
                   </select>
                 </div>
+
                 <div class="col-md-6">
                   <label class="form-label">% Cuota Inicial (ej. 20)</label>
                   <input type="number" id="porcentajeInicial" class="form-control" step="0.01" disabled />
                 </div>
+
                 <div class="col-md-6">
-                  <label class="form-label">Tasa Efectiva Anual (%)</label>
-                  <input type="number" id="tasaEfectiva" class="form-control" step="0.01" required />
+                  <label class="form-label">Monto de venta</label>
+                  <input type="number" id="precioVenta" class="form-control" />
                 </div>
-                <div class="col-md-6">
-                  <label class="form-label">Frecuencia de Pago (veces/año)</label>
-                  <input type="number" id="frecuencia" class="form-control" step="1" required />
-                </div>
-                <div class="col-md-6">
-                  <label class="form-label">Plazo Total (Años)</label>
-                  <input type="number" id="plazo" class="form-control" step="1" required />
-                </div>
+
                 <div class="col-md-6">
                   <label class="form-label">Tipo de Gracia</label>
                   <select id="tipoGracia" class="form-select">
@@ -90,8 +135,11 @@
                   </select>
                 </div>
               </div>
+
               <div class="mt-4">
-                <button type="button" id="calculateBtn" class="btn btn-dark w-100">Calcular Plan</button>
+                <button type="button" id="calculateBtn" class="btn btn-dark w-100">
+                  Calcular Plan
+                </button>
               </div>
             </form>
           </div>
@@ -117,10 +165,18 @@
       </div>
     </div>
 
-    <!-- Bootstrap JS -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.6/dist/js/bootstrap.bundle.min.js"></script>
 
-    <!-- Tu Script JS completo -->
+    <!-- Mostrar u ocultar capitalización dinámicamente -->
+    <script>
+      document.getElementById("tipoTasa").addEventListener("change", () => {
+        const tipo = document.getElementById("tipoTasa").value;
+        const capitalizacion = document.getElementById("capitalizacion");
+        capitalizacion.disabled = tipo !== "nominal";
+      });
+    </script>
+
     <script src="script.js"></script>
   </body>
 </html>
+

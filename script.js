@@ -1,74 +1,23 @@
-function formatValue(val) {
-  return Math.abs(val).toLocaleString("es-PE", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  });
-}
-
-// Habilita/deshabilita campo de capitalización según tipo de tasa
-const tipoTasaSelect = document.getElementById("tipoTasa");
-const capitalizacionSelect = document.getElementById("capitalizacion");
-tipoTasaSelect.addEventListener("change", () => {
-  capitalizacionSelect.disabled = tipoTasaSelect.value !== "nominal";
-});
-
-// Habilita cuota inicial si aplica
-document.getElementById("usaCuotaInicial").addEventListener("change", () => {
-  const habilitar = document.getElementById("usaCuotaInicial").value === "si";
-  document.getElementById("porcentajeInicial").disabled = !habilitar;
-});
-
-// Cálculo principal
 document.getElementById("calculateBtn").addEventListener("click", () => {
-  const usaCuota = document.getElementById("usaCuotaInicial").value === "si";
-  const precioVenta = parseFloat(document.getElementById("precioVenta").value);
-  const porcentajeInicial =
-    parseFloat(document.getElementById("porcentajeInicial").value || "0") / 100;
-
-  let principal;
-  if (usaCuota && precioVenta > 0 && porcentajeInicial >= 0) {
-    principal = precioVenta * (1 - porcentajeInicial);
-  } else {
-    principal = parseFloat(
-      prompt("Ingrese el monto del préstamo (sin cuota inicial):")
-    );
-  }
-
-  const tipoTasa = document.getElementById("tipoTasa").value;
-  const tasaInput = parseFloat(document.getElementById("tasaAnual").value) / 100;
-  const capitalizacion = tipoTasa === "nominal"
-    ? parseInt(document.getElementById("capitalizacion").value)
-    : null;
-
-  const tipoAnio = parseInt(document.getElementById("tipoAnio").value);
+  const VN = parseFloat(document.getElementById("valorNominal").value);
+  const TEA = parseFloat(document.getElementById("tasaEfectiva").value) / 100;
+  const COK = parseFloat(document.getElementById("tasaMercado").value) / 100;
   const frecuencia = parseInt(document.getElementById("frecuencia").value);
   const plazo = parseInt(document.getElementById("plazo").value);
   const tipoGracia = document.getElementById("tipoGracia").value;
 
   const n = frecuencia * plazo;
+  const tasaPeriodoTEA = Math.pow(1 + TEA, 1 / frecuencia) - 1;
+  const tasaPeriodoCOK = Math.pow(1 + COK, 1 / frecuencia) - 1;
 
-  // Convertir a TEA si es nominal
-  let TEA;
-  if (tipoTasa === "efectiva") {
-    TEA = tasaInput;
-  } else {
-    TEA = Math.pow(1 + tasaInput / capitalizacion, capitalizacion) - 1;
-  }
+  const numCuotasConGracia = frecuencia; // 1 año de gracia
+  const numAmortiza = tipoGracia === "ninguna" ? n : n - numCuotasConGracia;
+  const amortizacionBase = VN / numAmortiza;
 
-  // Calcular tasa del periodo con base en frecuencia
-  const tasaPeriodo = Math.pow(1 + TEA, 1 / frecuencia) - 1;
+  let saldo = VN;
+  let precio = 0;
 
-  const numPeriodosAmortiza =
-    tipoGracia === "ninguna"
-      ? n
-      : tipoGracia === "total" || tipoGracia === "parcial"
-      ? n - frecuencia
-      : n;
-
-  const amortizacion = principal / numPeriodosAmortiza;
-  let saldo = principal;
-
-  // Crear tabla
+  // Crear tabla HTML
   const tabla = document.createElement("table");
   tabla.className = "table table-striped table-bordered mt-3";
   const thead = tabla.createTHead();
@@ -78,8 +27,9 @@ document.getElementById("calculateBtn").addEventListener("click", () => {
     "Saldo Inicial",
     "Interés",
     "Amortización",
-    "Cuota",
+    "Cuota Total",
     "Saldo Final",
+    "Flujo Descontado"
   ];
   headers.forEach((text) => {
     const th = document.createElement("th");
@@ -88,32 +38,57 @@ document.getElementById("calculateBtn").addEventListener("click", () => {
   });
 
   const tbody = tabla.createTBody();
+  const format = (val) =>
+    Math.abs(val).toLocaleString("es-PE", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    });
 
   for (let i = 1; i <= n; i++) {
-    const interes = saldo * tasaPeriodo;
-    let amort = amortizacion;
-    let cuota = interes + amort;
+    const saldoInicial = saldo;
+    const interes = saldoInicial * tasaPeriodoTEA;
 
-    if (tipoGracia === "total" && i <= frecuencia) {
+    let amort = amortizacionBase;
+    if (tipoGracia === "total" && i <= numCuotasConGracia) {
       amort = 0;
-      cuota = interes;
-    } else if (tipoGracia === "parcial" && i <= frecuencia) {
-      amort = amortizacion * 0.5;
-      cuota = interes + amort;
+    } else if (tipoGracia === "parcial" && i <= numCuotasConGracia) {
+      amort = amortizacionBase * 0.5;
     }
 
-    const saldoFinal = saldo - amort;
+    const cuota = interes + amort;
+    const saldoFinal = saldoInicial - amort;
+    const flujoDescontado = cuota / Math.pow(1 + tasaPeriodoCOK, i);
 
-    const row = tbody.insertRow();
-    const valores = [i, saldo, interes, amort, cuota, saldoFinal];
+    precio += flujoDescontado;
+
+    const fila = tbody.insertRow();
+    const valores = [
+      i,
+      saldoInicial,
+      interes,
+      amort,
+      cuota,
+      saldoFinal,
+      flujoDescontado
+    ];
 
     valores.forEach((val) => {
-      const td = row.insertCell();
-      td.textContent = formatValue(val);
+      const td = fila.insertCell();
+      td.textContent = format(val);
     });
 
     saldo = saldoFinal;
   }
+
+  // Agregar fila resumen del precio
+  const rowTotal = tbody.insertRow();
+  const cellLabel = rowTotal.insertCell();
+  cellLabel.colSpan = 6;
+  cellLabel.className = "fw-bold text-end";
+  cellLabel.textContent = "Precio del Bono:";
+  const cellPrecio = rowTotal.insertCell();
+  cellPrecio.className = "fw-bold";
+  cellPrecio.textContent = "S/ " + format(precio);
 
   document.getElementById("amortizationTable").innerHTML = "";
   document.getElementById("amortizationTable").appendChild(tabla);

@@ -1,95 +1,127 @@
 // --- Funciones de Utilidad ---
 function formatValue(val, currency = "PEN", isPercentage = false) {
-  // Asegurarse de que la moneda nunca sea undefined
   const finalCurrency = currency || "PEN";
-
   if (isPercentage) {
-    // Manejar el caso de que 'val' sea undefined
     if (typeof val !== 'number') return 'N/A';
     return `${(val * 100).toFixed(2)}%`;
   }
-
-  // Manejar el caso de que 'val' sea undefined
   if (typeof val !== 'number') return formatValue(0, finalCurrency);
-
   const options = {
     style: "currency",
     currency: finalCurrency,
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   };
-  if (Math.abs(val) < 0.005) {
-    val = 0;
-  }
+  if (Math.abs(val) < 0.005) { val = 0; }
   return val.toLocaleString("es-PE", options);
 }
+
+// --- Lógica para mostrar/ocultar el Plazo de Gracia ---
+document.getElementById("tipoGracia").addEventListener("change", function() {
+  const plazoGraciaWrapper = document.getElementById("plazoGraciaWrapper");
+  plazoGraciaWrapper.style.display = (this.value !== "ninguna") ? "block" : "none";
+});
 
 // --- Lógica Principal del Cálculo del Bono ---
 document.getElementById("calculateBtn").addEventListener("click", () => {
   // 1. LEER DATOS DEL FORMULARIO
-  const valorNominal = parseFloat(document.getElementById("precioVenta").value); // Mantengo el ID 'precioVenta' para que coincida con tu HTML
+  const valorNominal = parseFloat(document.getElementById("precioVenta").value);
   const tasaAnualInput = parseFloat(document.getElementById("tasaAnual").value) / 100;
   const plazoEnAnios = parseInt(document.getElementById("plazo").value);
   const frecuenciaCupon = parseInt(document.getElementById("frecuenciaCupon").value);
   const tipoAnio = parseInt(document.getElementById("tipoAnio").value);
   const tipoGracia = document.getElementById("tipoGracia").value;
   const moneda = document.getElementById("moneda").value;
-  
+
   if (isNaN(valorNominal) || isNaN(tasaAnualInput) || isNaN(plazoEnAnios)) {
     alert("Por favor, complete todos los campos requeridos: Valor Nominal, Tasa Anual y Plazo.");
     return;
   }
-  
-  // 2. CÁLCULOS PREVIOS
-  const tipoTasa = "efectiva";
-  const TEA = tasaAnualInput;
 
+  // 2. CÁLCULOS PREVIOS
+  const TEA = tasaAnualInput;
   const diasPorAnio = tipoAnio;
   const diasPorPeriodo = diasPorAnio / frecuenciaCupon;
   const tasaPeriodo = Math.pow(1 + TEA, diasPorPeriodo / diasPorAnio) - 1;
 
   const totalCupones = plazoEnAnios * frecuenciaCupon;
-  const periodosGracia = (tipoGracia !== "ninguna") ? frecuenciaCupon : 0;
+  const plazoGraciaAnios = (tipoGracia !== 'ninguna') ? parseInt(document.getElementById("plazoGracia").value) : 0;
+  const periodosGracia = plazoGraciaAnios * frecuenciaCupon;
+  
+  // El capital se amortiza sobre los periodos SIN NINGUN TIPO de gracia.
+  // En ambos casos de gracia (Total y Parcial), la amortización es 0.
   const periodosParaAmortizar = totalCupones - periodosGracia;
-  const amortizacionConstante = (periodosParaAmortizar > 0) ? valorNominal / periodosParaAmortizar : 0;
+  
+  if (periodosGracia >= totalCupones) {
+    alert("El plazo del período de gracia no puede ser igual o mayor al plazo total del bono.");
+    return;
+  }
+  
+  // La amortización constante se calcula sobre el SALDO que queda DESPUÉS del periodo de gracia.
+  // Este cálculo se debe hacer DENTRO del bucle si hay gracia total.
+  let amortizacionConstante = 0;
+  let saldoPostGracia = valorNominal; // Valor inicial antes de cualquier gracia
+  
+  // Si la gracia es total, el saldo aumenta.
+  if (tipoGracia === 'total') {
+      for (let i = 0; i < periodosGracia; i++) {
+          saldoPostGracia += saldoPostGracia * tasaPeriodo;
+      }
+  }
+
+  if (periodosParaAmortizar > 0) {
+      amortizacionConstante = saldoPostGracia / periodosParaAmortizar;
+  }
+
 
   let saldo = valorNominal;
   const cronograma = [];
 
-  // 3. GENERAR EL CRONOGRAMA
+  // 3. GENERAR EL CRONOGRAMA CON LA LÓGICA CORRECTA
   for (let i = 1; i <= totalCupones; i++) {
-    // (Misma lógica de cálculo que en la versión anterior)
     const interes = saldo * tasaPeriodo;
-    let amortizacionPeriodo = amortizacionConstante;
-    
-    if (tipoGracia === "total" && i <= periodosGracia) {
-      amortizacionPeriodo = 0;
-    } else if (tipoGracia === "parcial" && i <= periodosGracia) {
-      amortizacionPeriodo = 0;
-    }
+    let amortizacionPeriodo = 0; // Por defecto
+    let cuponTotal = 0; // Por defecto
+    let saldoFinal;
 
-    if (i > periodosGracia) {
-        amortizacionPeriodo = amortizacionConstante;
-    } else {
+    const esPeriodoDeGracia = i <= periodosGracia;
+
+    if (esPeriodoDeGracia) {
+      if (tipoGracia === "total") {
+        // REGLA: No se paga nada, el interés se capitaliza.
         amortizacionPeriodo = 0;
+        cuponTotal = 0;
+        saldoFinal = saldo + interes;
+      } else { // tipoGracia === "parcial"
+        // REGLA: Se paga solo el interés, el saldo no cambia.
+        amortizacionPeriodo = 0;
+        cuponTotal = interes;
+        saldoFinal = saldo;
+      }
+    } else {
+      // PERÍODO NORMAL (SIN GRACIA - MÉTODO ALEMÁN)
+      amortizacionPeriodo = amortizacionConstante;
+      cuponTotal = interes + amortizacionPeriodo;
+      saldoFinal = saldo - amortizacionPeriodo;
     }
 
-    const cuponTotal = interes + amortizacionPeriodo;
-    const saldoFinal = saldo - amortizacionPeriodo;
-
-    if (i === totalCupones && saldoFinal.toFixed(2) != 0) {
+    // Ajuste final para que el último saldo sea exactamente 0
+    if (i === totalCupones && Math.abs(saldoFinal) > 0.005) {
       amortizacionPeriodo += saldoFinal;
+      cuponTotal += saldoFinal;
+      saldoFinal = 0;
     }
-
+    
     cronograma.push({
       numero: i,
       saldoInicial: saldo,
       interes: interes,
       amortizacion: amortizacionPeriodo,
       cupon: cuponTotal,
-      saldoFinal: saldo - amortizacionPeriodo,
+      saldoFinal: saldoFinal,
     });
-    saldo = saldo - amortizacionPeriodo;
+
+    saldo = saldoFinal;
   }
 
   // 4. MOSTRAR LA TABLA EN EL HTML
@@ -103,6 +135,7 @@ document.getElementById("calculateBtn").addEventListener("click", () => {
     frecuencia: frecuenciaCupon,
     tipoAnio: tipoAnio,
     tipoGracia: tipoGracia,
+    plazoGracia: plazoGraciaAnios,
     moneda: moneda,
     fecha: new Date().toLocaleString("es-PE"),
   });
@@ -137,10 +170,7 @@ function mostrarBonos() {
 
   const thead = tabla.createTHead();
   const headerRow = thead.insertRow();
-  // Columnas relevantes para el bono
-  const columnas = [
-    "#", "Fecha", "V. Nominal", "Tasa Anual", "Plazo (Años)", "Frec.", "Gracia", "Acciones"
-  ];
+  const columnas = ["#", "Fecha", "V. Nominal", "Tasa Anual", "Plazo (Años)", "Frec.", "Gracia", "Acciones"];
   columnas.forEach((text) => {
     const th = document.createElement("th");
     th.textContent = text;
@@ -150,16 +180,13 @@ function mostrarBonos() {
   const tbody = tabla.createTBody();
   bonos.forEach((bono, index) => {
     const row = tbody.insertRow();
-    
-    // Contenido de las celdas adaptado a los datos del bono
     row.insertCell().textContent = index + 1;
     row.insertCell().textContent = bono.fecha;
     row.insertCell().textContent = formatValue(bono.valorNominal, bono.moneda);
-    row.insertCell().textContent = formatValue(bono.tasaAnual, bono.moneda, true); // Formato de porcentaje
+    row.insertCell().textContent = formatValue(bono.tasaAnual, bono.moneda, true);
     row.insertCell().textContent = bono.plazo;
     row.insertCell().textContent = bono.frecuencia;
-    row.insertCell().textContent = bono.tipoGracia;
-
+    row.insertCell().textContent = `${bono.tipoGracia}${bono.tipoGracia !== 'ninguna' ? ` (${bono.plazoGracia}a)` : ''}`;
     const acciones = row.insertCell();
     const btnCargar = document.createElement("button");
     btnCargar.textContent = "Cargar";
@@ -177,24 +204,28 @@ function cargarBono(index) {
   
   const bono = bonos[index];
 
-  // Cargar los datos del bono guardado en el formulario
   document.getElementById("precioVenta").value = bono.valorNominal;
-  document.getElementById("tasaAnual").value = bono.tasaAnual * 100; // Convertir de nuevo a %
+  document.getElementById("tasaAnual").value = bono.tasaAnual * 100;
   document.getElementById("plazo").value = bono.plazo;
   document.getElementById("frecuenciaCupon").value = bono.frecuencia;
   document.getElementById("tipoAnio").value = bono.tipoAnio;
   document.getElementById("tipoGracia").value = bono.tipoGracia;
   document.getElementById("moneda").value = bono.moneda;
-  
-  // Opcional: Desplazar la vista hacia el formulario para que el usuario vea que se cargó
-  document.getElementById('bondForm').scrollIntoView({ behavior: 'smooth' });
 
+  const plazoGraciaWrapper = document.getElementById("plazoGraciaWrapper");
+  if (bono.tipoGracia !== 'ninguna' && bono.plazoGracia) {
+    document.getElementById("plazoGracia").value = bono.plazoGracia;
+    plazoGraciaWrapper.style.display = 'block';
+  } else {
+    plazoGraciaWrapper.style.display = 'none';
+  }
+  
+  document.getElementById('bondForm').scrollIntoView({ behavior: 'smooth' });
   alert("Datos de la simulación cargados en el formulario.");
 }
 
 // --- Función para mostrar la tabla del cronograma ---
 function mostrarTabla(cronograma, moneda) {
-  // (Misma función mostrarTabla que en la versión anterior)
   const tablaContainer = document.getElementById("amortizationTable");
   tablaContainer.innerHTML = "";
 
@@ -231,5 +262,4 @@ function mostrarTabla(cronograma, moneda) {
 }
 
 // --- Evento de Carga Inicial ---
-// Muestra el historial guardado tan pronto como la página se carga.
 window.onload = mostrarBonos;

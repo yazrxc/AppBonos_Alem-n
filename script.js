@@ -1,147 +1,124 @@
-function formatValue(val) {
-  return Math.abs(val).toLocaleString("es-PE", {
+// --- Funciones de Utilidad ---
+function formatValue(val, currency = "PEN", isPercentage = false) {
+  // Asegurarse de que la moneda nunca sea undefined
+  const finalCurrency = currency || "PEN";
+
+  if (isPercentage) {
+    // Manejar el caso de que 'val' sea undefined
+    if (typeof val !== 'number') return 'N/A';
+    return `${(val * 100).toFixed(2)}%`;
+  }
+
+  // Manejar el caso de que 'val' sea undefined
+  if (typeof val !== 'number') return formatValue(0, finalCurrency);
+
+  const options = {
+    style: "currency",
+    currency: finalCurrency,
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
-  });
+  };
+  if (Math.abs(val) < 0.005) {
+    val = 0;
+  }
+  return val.toLocaleString("es-PE", options);
 }
 
-// Habilita/deshabilita campo de capitalización según tipo de tasa
-const tipoTasaSelect = document.getElementById("tipoTasa");
-const capitalizacionSelect = document.getElementById("capitalizacion");
-tipoTasaSelect.addEventListener("change", () => {
-  capitalizacionSelect.disabled = tipoTasaSelect.value !== "nominal";
-});
-
-// Habilita cuota inicial si aplica
-document.getElementById("usaCuotaInicial").addEventListener("change", () => {
-  const habilitar = document.getElementById("usaCuotaInicial").value === "si";
-  document.getElementById("porcentajeInicial").disabled = !habilitar;
-});
-
-// Cálculo principal
+// --- Lógica Principal del Cálculo del Bono ---
 document.getElementById("calculateBtn").addEventListener("click", () => {
-  const usaCuota = document.getElementById("usaCuotaInicial").value === "si";
-  const precioVenta = parseFloat(document.getElementById("precioVenta").value);
-  const porcentajeInicial =
-    parseFloat(document.getElementById("porcentajeInicial").value || "0") / 100;
-
-  let principal;
-  if (usaCuota && precioVenta > 0 && porcentajeInicial >= 0) {
-    principal = precioVenta * (1 - porcentajeInicial);
-  } else {
-    principal = parseFloat(
-      prompt("Ingrese el monto del préstamo (sin cuota inicial):")
-    );
-  }
-
-  const tipoTasa = document.getElementById("tipoTasa").value;
-  const tasaInput = parseFloat(document.getElementById("tasaAnual").value) / 100;
-  const capitalizacion = tipoTasa === "nominal"
-    ? parseInt(document.getElementById("capitalizacion").value)
-    : null;
-
+  // 1. LEER DATOS DEL FORMULARIO
+  const valorNominal = parseFloat(document.getElementById("precioVenta").value); // Mantengo el ID 'precioVenta' para que coincida con tu HTML
+  const tasaAnualInput = parseFloat(document.getElementById("tasaAnual").value) / 100;
+  const plazoEnAnios = parseInt(document.getElementById("plazo").value);
+  const frecuenciaCupon = parseInt(document.getElementById("frecuenciaCupon").value);
   const tipoAnio = parseInt(document.getElementById("tipoAnio").value);
-  const frecuencia = parseInt(document.getElementById("frecuencia").value);
-  const plazo = parseInt(document.getElementById("plazo").value);
   const tipoGracia = document.getElementById("tipoGracia").value;
-
-  const n = frecuencia * plazo;
-
-  // Convertir a TEA si es nominal
-  let TEA;
-  if (tipoTasa === "efectiva") {
-    TEA = tasaInput;
-  } else {
-    TEA = Math.pow(1 + tasaInput / capitalizacion, capitalizacion) - 1;
+  const moneda = document.getElementById("moneda").value;
+  
+  if (isNaN(valorNominal) || isNaN(tasaAnualInput) || isNaN(plazoEnAnios)) {
+    alert("Por favor, complete todos los campos requeridos: Valor Nominal, Tasa Anual y Plazo.");
+    return;
   }
+  
+  // 2. CÁLCULOS PREVIOS
+  const tipoTasa = "efectiva";
+  const TEA = tasaAnualInput;
 
-  // Calcular tasa del periodo con base en frecuencia
-  const tasaPeriodo = Math.pow(1 + TEA, 1 / frecuencia) - 1;
+  const diasPorAnio = tipoAnio;
+  const diasPorPeriodo = diasPorAnio / frecuenciaCupon;
+  const tasaPeriodo = Math.pow(1 + TEA, diasPorPeriodo / diasPorAnio) - 1;
 
-  const numPeriodosAmortiza =
-    tipoGracia === "ninguna"
-      ? n
-      : tipoGracia === "total" || tipoGracia === "parcial"
-      ? n - frecuencia
-      : n;
+  const totalCupones = plazoEnAnios * frecuenciaCupon;
+  const periodosGracia = (tipoGracia !== "ninguna") ? frecuenciaCupon : 0;
+  const periodosParaAmortizar = totalCupones - periodosGracia;
+  const amortizacionConstante = (periodosParaAmortizar > 0) ? valorNominal / periodosParaAmortizar : 0;
 
-  const amortizacion = principal / numPeriodosAmortiza;
-  let saldo = principal;
+  let saldo = valorNominal;
+  const cronograma = [];
 
-  // Crear tabla
-  const tabla = document.createElement("table");
-  tabla.className = "table table-striped table-bordered mt-3";
-  const thead = tabla.createTHead();
-  const headerRow = thead.insertRow();
-  const headers = [
-    "N°",
-    "Saldo Inicial",
-    "Interés",
-    "Amortización",
-    "Cuota",
-    "Saldo Final",
-  ];
-  headers.forEach((text) => {
-    const th = document.createElement("th");
-    th.textContent = text;
-    headerRow.appendChild(th);
-  });
-
-  const tbody = tabla.createTBody();
-
-  for (let i = 1; i <= n; i++) {
+  // 3. GENERAR EL CRONOGRAMA
+  for (let i = 1; i <= totalCupones; i++) {
+    // (Misma lógica de cálculo que en la versión anterior)
     const interes = saldo * tasaPeriodo;
-    let amort = amortizacion;
-    let cuota = interes + amort;
-
-    if (tipoGracia === "total" && i <= frecuencia) {
-      amort = 0;
-      cuota = interes;
-    } else if (tipoGracia === "parcial" && i <= frecuencia) {
-      amort = amortizacion * 0.5;
-      cuota = interes + amort;
+    let amortizacionPeriodo = amortizacionConstante;
+    
+    if (tipoGracia === "total" && i <= periodosGracia) {
+      amortizacionPeriodo = 0;
+    } else if (tipoGracia === "parcial" && i <= periodosGracia) {
+      amortizacionPeriodo = 0;
     }
 
-    const saldoFinal = saldo - amort;
+    if (i > periodosGracia) {
+        amortizacionPeriodo = amortizacionConstante;
+    } else {
+        amortizacionPeriodo = 0;
+    }
 
-    const row = tbody.insertRow();
-    const valores = [i, saldo, interes, amort, cuota, saldoFinal];
+    const cuponTotal = interes + amortizacionPeriodo;
+    const saldoFinal = saldo - amortizacionPeriodo;
 
-    valores.forEach((val) => {
-      const td = row.insertCell();
-      td.textContent = formatValue(val);
+    if (i === totalCupones && saldoFinal.toFixed(2) != 0) {
+      amortizacionPeriodo += saldoFinal;
+    }
+
+    cronograma.push({
+      numero: i,
+      saldoInicial: saldo,
+      interes: interes,
+      amortizacion: amortizacionPeriodo,
+      cupon: cuponTotal,
+      saldoFinal: saldo - amortizacionPeriodo,
     });
-
-    saldo = saldoFinal;
+    saldo = saldo - amortizacionPeriodo;
   }
 
-  document.getElementById("amortizationTable").innerHTML = "";
-  document.getElementById("amortizationTable").appendChild(tabla);
-  document.getElementById("results").classList.remove("d-none");
+  // 4. MOSTRAR LA TABLA EN EL HTML
+  mostrarTabla(cronograma, moneda);
+  
+  // 5. GUARDAR LA SIMULACIÓN
+  guardarSimulacion({
+    valorNominal: valorNominal,
+    tasaAnual: tasaAnualInput,
+    plazo: plazoEnAnios,
+    frecuencia: frecuenciaCupon,
+    tipoAnio: tipoAnio,
+    tipoGracia: tipoGracia,
+    moneda: moneda,
+    fecha: new Date().toLocaleString("es-PE"),
+  });
 
-  // Guardar la simulación
-  const bonoData = {
-    precioVenta,
-    usaCuota,
-    porcentajeInicial: porcentajeInicial * 100,
-    tasaEfectiva: TEA * 100,
-    frecuencia,
-    plazo,
-    tipoGracia,
-    tipoTasa,
-    capitalizacion,
-    tipoAnio,
-    fecha: new Date().toLocaleString(),
-  };
-
-  const bonosGuardados = JSON.parse(localStorage.getItem("bonos")) || [];
-  bonosGuardados.push(bonoData);
-  localStorage.setItem("bonos", JSON.stringify(bonosGuardados));
-
+  // 6. ACTUALIZAR Y MOSTRAR LA TABLA DEL HISTORIAL
   mostrarBonos();
 });
 
-// Mostrar lista de bonos
+// --- Funciones para el Historial (LocalStorage) ---
+
+function guardarSimulacion(bonoData) {
+  const bonosGuardados = JSON.parse(localStorage.getItem("bonos")) || [];
+  bonosGuardados.push(bonoData);
+  localStorage.setItem("bonos", JSON.stringify(bonosGuardados));
+}
+
 function mostrarBonos() {
   const bonos = JSON.parse(localStorage.getItem("bonos")) || [];
   const tablaBonosDiv = document.getElementById("tablaBonos");
@@ -153,22 +130,16 @@ function mostrarBonos() {
   }
 
   contenedor.classList.remove("d-none");
+  tablaBonosDiv.innerHTML = ""; // Limpiar antes de redibujar
 
   const tabla = document.createElement("table");
-  tabla.className = "table table-hover table-bordered";
+  tabla.className = "table table-hover table-sm table-bordered";
 
   const thead = tabla.createTHead();
   const headerRow = thead.insertRow();
+  // Columnas relevantes para el bono
   const columnas = [
-    "#",
-    "Fecha",
-    "Precio",
-    "Cuota Inicial",
-    "Tasa",
-    "Plazo",
-    "Frecuencia",
-    "Gracia",
-    "Acciones",
+    "#", "Fecha", "V. Nominal", "Tasa Anual", "Plazo (Años)", "Frec.", "Gracia", "Acciones"
   ];
   columnas.forEach((text) => {
     const th = document.createElement("th");
@@ -179,58 +150,86 @@ function mostrarBonos() {
   const tbody = tabla.createTBody();
   bonos.forEach((bono, index) => {
     const row = tbody.insertRow();
-    const cells = [
-      index + 1,
-      bono.fecha,
-      formatValue(bono.precioVenta),
-      bono.usaCuota ? bono.porcentajeInicial + "%" : "No",
-      bono.tasaEfectiva + "%",
-      bono.plazo,
-      bono.frecuencia,
-      bono.tipoGracia,
-    ];
-    cells.forEach((val) => {
-      const td = row.insertCell();
-      td.textContent = val;
-    });
+    
+    // Contenido de las celdas adaptado a los datos del bono
+    row.insertCell().textContent = index + 1;
+    row.insertCell().textContent = bono.fecha;
+    row.insertCell().textContent = formatValue(bono.valorNominal, bono.moneda);
+    row.insertCell().textContent = formatValue(bono.tasaAnual, bono.moneda, true); // Formato de porcentaje
+    row.insertCell().textContent = bono.plazo;
+    row.insertCell().textContent = bono.frecuencia;
+    row.insertCell().textContent = bono.tipoGracia;
 
     const acciones = row.insertCell();
-    const btn = document.createElement("button");
-    btn.textContent = "Editar";
-    btn.className = "btn btn-sm btn-primary";
-    btn.onclick = () => cargarBono(index);
-    acciones.appendChild(btn);
+    const btnCargar = document.createElement("button");
+    btnCargar.textContent = "Cargar";
+    btnCargar.className = "btn btn-sm btn-primary";
+    btnCargar.onclick = () => cargarBono(index);
+    acciones.appendChild(btnCargar);
   });
 
-  tablaBonosDiv.innerHTML = "";
   tablaBonosDiv.appendChild(tabla);
 }
 
-// Cargar datos en el formulario
 function cargarBono(index) {
   const bonos = JSON.parse(localStorage.getItem("bonos")) || [];
+  if (!bonos[index]) return;
+  
   const bono = bonos[index];
 
-  document.getElementById("precioVenta").value = bono.precioVenta;
-  document.getElementById("usaCuotaInicial").value = bono.usaCuota ? "si" : "no";
-  document.getElementById("porcentajeInicial").disabled = !bono.usaCuota;
-  document.getElementById("porcentajeInicial").value = bono.porcentajeInicial;
-
-  document.getElementById("tasaAnual").value = bono.tasaEfectiva;
-  document.getElementById("frecuencia").value = bono.frecuencia;
+  // Cargar los datos del bono guardado en el formulario
+  document.getElementById("precioVenta").value = bono.valorNominal;
+  document.getElementById("tasaAnual").value = bono.tasaAnual * 100; // Convertir de nuevo a %
   document.getElementById("plazo").value = bono.plazo;
+  document.getElementById("frecuenciaCupon").value = bono.frecuencia;
+  document.getElementById("tipoAnio").value = bono.tipoAnio;
   document.getElementById("tipoGracia").value = bono.tipoGracia;
+  document.getElementById("moneda").value = bono.moneda;
+  
+  // Opcional: Desplazar la vista hacia el formulario para que el usuario vea que se cargó
+  document.getElementById('bondForm').scrollIntoView({ behavior: 'smooth' });
 
-  if (bono.tipoTasa) document.getElementById("tipoTasa").value = bono.tipoTasa;
-  if (bono.capitalizacion)
-    document.getElementById("capitalizacion").value = bono.capitalizacion;
-  if (bono.tipoAnio)
-    document.getElementById("tipoAnio").value = bono.tipoAnio;
-
-  alert("Bono cargado en el formulario. Puedes recalcular o modificar.");
+  alert("Datos de la simulación cargados en el formulario.");
 }
 
+// --- Función para mostrar la tabla del cronograma ---
+function mostrarTabla(cronograma, moneda) {
+  // (Misma función mostrarTabla que en la versión anterior)
+  const tablaContainer = document.getElementById("amortizationTable");
+  tablaContainer.innerHTML = "";
+
+  const tabla = document.createElement("table");
+  tabla.className = "table table-striped table-bordered mt-3";
+  
+  const thead = tabla.createTHead();
+  const headerRow = thead.insertRow();
+  const headers = ["N° Cupón", "Saldo Inicial", "Interés", "Amortización", "Cupón + Amort.", "Saldo Final"];
+  headers.forEach((text) => {
+    const th = document.createElement("th");
+    th.textContent = text;
+    th.className = "text-center";
+    headerRow.appendChild(th);
+  });
+
+  const tbody = tabla.createTBody();
+  cronograma.forEach((fila) => {
+    const row = tbody.insertRow();
+    const valores = [fila.numero, fila.saldoInicial, fila.interes, fila.amortizacion, fila.cupon, fila.saldoFinal];
+    let td = row.insertCell();
+    td.textContent = valores[0];
+    td.className = "text-center";
+    
+    for (let i = 1; i < valores.length; i++) {
+      td = row.insertCell();
+      td.textContent = formatValue(valores[i], moneda);
+      td.className = "text-end";
+    }
+  });
+
+  tablaContainer.appendChild(tabla);
+  document.getElementById("results").classList.remove("d-none");
+}
+
+// --- Evento de Carga Inicial ---
+// Muestra el historial guardado tan pronto como la página se carga.
 window.onload = mostrarBonos;
-
-
-
